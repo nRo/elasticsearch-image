@@ -44,7 +44,7 @@ public class ImageQueryParser implements QueryParser {
 
     @Override
     public String[] names() {
-        return new String[] {NAME};
+        return new String[]{NAME};
     }
 
     @Override
@@ -52,7 +52,7 @@ public class ImageQueryParser implements QueryParser {
         XContentParser parser = parseContext.parser();
 
         XContentParser.Token token = parser.nextToken();
-     
+
         if (token != XContentParser.Token.FIELD_NAME) {
             throw new QueryParsingException(parseContext, "[image] query malformed, no field");
         }
@@ -82,17 +82,20 @@ public class ImageQueryParser implements QueryParser {
                     } else if ("image".equals(currentFieldName)) {
                         image = parser.binaryValue();
                     } else if ("hash".equals(currentFieldName)) {
-                        hashEnum = HashEnum.getByName(parser.text());
+                        String hashName = parser.textOrNull();
+                        if (hashName != null) {
+                            hashEnum = HashEnum.getByName(hashName);
+                        }
                     } else if ("boost".equals(currentFieldName)) {
                         boost = parser.floatValue();
-                    }else if ("index".equals(currentFieldName)) {
-                        lookupIndex = parser.text();
+                    } else if ("index".equals(currentFieldName)) {
+                        lookupIndex = parser.textOrNull();
                     } else if ("type".equals(currentFieldName)) {
-                        lookupType = parser.text();
+                        lookupType = parser.textOrNull();
                     } else if ("field".equals(currentFieldName)) {
-                        field = parser.text();
+                        field = parser.textOrNull();
                     } else if ("id".equals(currentFieldName)) {
-                        lookupId = parser.text();
+                        lookupId = parser.textOrNull();
                     } else if ("routing".equals(currentFieldName)) {
                         lookupRouting = parser.textOrNull();
                     } else {
@@ -105,81 +108,79 @@ public class ImageQueryParser implements QueryParser {
 
         if (featureEnum == null) {
             throw new QueryParsingException(parseContext, "No feature specified for image query");
-        } 
-        
-        if(field == null)
-    		field = fieldName;
+        }
+
+        if (field == null)
+            field = fieldName;
 
         String luceneFieldName = field + "." + featureEnum.name();
         LireFeature lireFeature = null;
 
         if (image != null) {
-            
+
             try {
                 lireFeature = featureEnum.getFeatureClass().newInstance();
                 BufferedImage img = ImageIO.read(new ByteBufferStreamInput(ByteBuffer.wrap(image)));
                 if (Math.max(img.getHeight(), img.getWidth()) > ImageMapper.MAX_IMAGE_DIMENSION) {
                     img = ImageUtils.scaleImage(img, ImageMapper.MAX_IMAGE_DIMENSION);
                 }
-                ((Extractor)lireFeature).extract(img);
+                ((Extractor) lireFeature).extract(img);
             } catch (Exception e) {
                 throw new ElasticsearchImageProcessException("Failed to parse image", e);
             }
-            
+
         } else if (lookupIndex != null && lookupType != null && lookupId != null) {
-            
+
             String lookupFieldName = field + "." + featureEnum.name();
 
             GetResponse response = client.get(new GetRequest(lookupIndex, lookupType, lookupId).preference("_local").routing(lookupRouting).fields(lookupFieldName).realtime(false)).actionGet();
-      
+
             if (response.isExists()) {
                 GetField getField = response.getField(lookupFieldName);
-                
+
                 if (getField == null) {
                     throw new ElasticsearchImageProcessException("field:" + field + " not found in index:" + lookupIndex);
                 }
-                
+
                 BytesRef bytesReference = (BytesRef) getField.getValue();
-                
+
                 try {
                     lireFeature = featureEnum.getFeatureClass().newInstance();
                     lireFeature.setByteArrayRepresentation(bytesReference.bytes);
                 } catch (Exception e) {
                     throw new ElasticsearchImageProcessException("Failed to parse image", e);
                 }
-            }
-            else
-            {
-        	throw new ElasticsearchImageProcessException("Image not found from field:" + field);
+            } else {
+                throw new ElasticsearchImageProcessException("Image not found from field:" + field);
             }
         }
-        
+
         if (lireFeature == null)
             throw new QueryParsingException(parseContext, "No feature found for image query or missing parameters");
-        
 
-        if (hashEnum == null) 
+        if (hashEnum == null) {
             throw new QueryParsingException(parseContext, "No hash found for image query");
-            
+        }
         int[] hash = null;
-        
+
         if (hashEnum.equals(HashEnum.BIT_SAMPLING)) {
             hash = BitSampling.generateHashes(lireFeature.getFeatureVector());
         } else if (hashEnum.equals(HashEnum.LSH)) {
             hash = LocalitySensitiveHashing.generateHashes(lireFeature.getFeatureVector());
-        }            
+        }
 
-        String hashFieldName = luceneFieldName + "." + ImageMapper.HASH + "." + hashEnum.name();
 
-        BooleanQuery.Builder builder=new BooleanQuery.Builder().setDisableCoord(true);
+        BooleanQuery.Builder builder = new BooleanQuery.Builder().setDisableCoord(true);
 
         ImageScoreCache imageScoreCache = new ImageScoreCache();
 
-        for (int h : hash) {                   
+
+        String hashFieldName = luceneFieldName + "." + ImageMapper.HASH + "." + hashEnum.name();
+        for (int h : hash) {
             builder.add(new BooleanClause(new ImageHashQuery(new Term(hashFieldName, Integer.toString(h)), luceneFieldName, lireFeature, imageScoreCache, boost), BooleanClause.Occur.SHOULD));
-	}
-            
+        }
+
         return builder.build();
     }
-        
+
 }

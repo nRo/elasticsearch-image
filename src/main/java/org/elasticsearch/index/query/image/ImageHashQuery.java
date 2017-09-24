@@ -1,14 +1,14 @@
 package org.elasticsearch.index.query.image;
 
+import net.semanticmetadata.lire.imageanalysis.features.LireFeature;
+import org.apache.lucene.index.*;
+import org.apache.lucene.search.*;
+import org.apache.lucene.util.ToStringUtils;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
-import org.apache.lucene.index.*;
-import org.apache.lucene.search.*;
-import org.apache.lucene.util.ToStringUtils;
-import net.semanticmetadata.lire.imageanalysis.features.LireFeature;
 
 import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
@@ -77,7 +77,7 @@ public class ImageHashQuery extends Query {
     }
     
     
-    final class ImageHashWeight extends Weight 
+    final class ImageHashWeight extends Weight
     {
         private final TermContext termStates;
 
@@ -101,7 +101,7 @@ public class ImageHashQuery extends Query {
 
         @Override
         public Scorer scorer(LeafReaderContext context) throws IOException {
-            assert termStates.topReaderContext == ReaderUtil.getTopLevelContext(context) : "The top-reader used to create Weight (" + termStates.topReaderContext + ") is not the same as the current reader's top-reader (" + ReaderUtil.getTopLevelContext(context);
+            //assert termStates.topReaderContext == ReaderUtil.getTopLevelContext(context) : "The top-reader used to create Weight (" + termStates.topReaderContext + ") is not the same as the current reader's top-reader (" + ReaderUtil.getTopLevelContext(context);
             final TermsEnum termsEnum = getTermsEnum(context);
             if (termsEnum == null) {
                 return null;
@@ -155,7 +155,7 @@ public class ImageHashQuery extends Query {
     }
     
     
-    final class ImageHashScorer extends AbstractImageScorer 
+    final class ImageHashScorer extends AbstractImageScorer
     {
         private final PostingsEnum docsEnum;
         private final IndexReader reader;

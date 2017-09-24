@@ -1,11 +1,14 @@
 package org.elasticsearch.index.mapper.image;
 
+import com.carrotsearch.hppc.cursors.ObjectObjectCursor;
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.imaging.ImageProcessingException;
 import com.drew.metadata.Directory;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.Tag;
-
+import com.google.common.collect.Lists;
+import com.google.common.collect.MapMaker;
+import com.google.common.collect.Maps;
 import net.semanticmetadata.lire.imageanalysis.features.Extractor;
 import net.semanticmetadata.lire.imageanalysis.features.LireFeature;
 import net.semanticmetadata.lire.indexers.hashing.BitSampling;
@@ -19,10 +22,6 @@ import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.ElasticsearchGenerationException;
 import org.elasticsearch.ElasticsearchImageProcessException;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.MapMaker;
-import com.google.common.collect.Maps;
-import com.carrotsearch.hppc.cursors.ObjectObjectCursor;
 import org.elasticsearch.common.io.stream.ByteBufferStreamInput;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.ESLoggerFactory;
@@ -37,6 +36,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -44,7 +44,6 @@ import java.util.concurrent.Executor;
 
 import static org.elasticsearch.index.mapper.MapperBuilders.binaryField;
 import static org.elasticsearch.index.mapper.MapperBuilders.stringField;
-
 
 
 public class ImageMapper extends FieldMapper {
@@ -132,7 +131,7 @@ public class ImageMapper extends FieldMapper {
         @Override
         @SuppressWarnings("unchecked")
         public ImageMapper build(BuilderContext context) {
-                        
+
             Map<String, FieldMapper> featureMappers = Maps.newHashMap();
             Map<String, FieldMapper> hashMappers = Maps.newHashMap();
             Map<String, FieldMapper> metadataMappers = Maps.newHashMap();
@@ -170,9 +169,9 @@ public class ImageMapper extends FieldMapper {
 
             MappedFieldType defaultFieldType = Defaults.FIELD_TYPE.clone();
             defaultFieldType.setNames(new Names(name));
-            
+
             fieldType.setNames(new Names(name));
-            
+
             return new ImageMapper(name, threadPool, context.indexSettings(), features, featureMappers, hashMappers, metadataMappers,
         	    fieldType, defaultFieldType, multiFieldsBuilder.build(this, context), copyTo);
         }
@@ -182,11 +181,11 @@ public class ImageMapper extends FieldMapper {
 	    return "Builder [threadPool=" + threadPool + ", features=" + features + ", metadataBuilders="
 		    + metadataBuilders + "]";
 	}
-                
+
     }
-    
+
     public static class TypeParser implements Mapper.TypeParser {
-	
+
         private ThreadPool threadPool;
 
         public TypeParser() { }
@@ -202,18 +201,19 @@ public class ImageMapper extends FieldMapper {
             ImageMapper.Builder builder = new ImageMapper.Builder(name, threadPool);
             Map<String, Object> features = Maps.newHashMap();
             Map<String, Object> metadatas = Maps.newHashMap();
-
-            for (Map.Entry<String, Object> entry : node.entrySet()) {
+            Iterator<Map.Entry<String,Object>> it = node.entrySet().iterator();
+            while(it.hasNext()){
+                Map.Entry<String,Object> entry = it.next();
                 String fieldName = entry.getKey();
                 Object fieldNode = entry.getValue();
 
                 if (FEATURE.equals(fieldName)) {
-                   features = (Map<String, Object>) fieldNode;
+                    features = (Map<String, Object>) fieldNode;
                 } else if (METADATA.equals(fieldName)) {
                     metadatas = (Map<String, Object>) fieldNode;
                 }
+                it.remove();
             }
-            
             if (features == null || features.isEmpty()) {
                 throw new ElasticsearchGenerationException("Feature not found");
             }
@@ -226,7 +226,6 @@ public class ImageMapper extends FieldMapper {
                 if(featureMap.isEmpty()) {
                     throw new ElasticsearchImageProcessException("hash is not specific.");
                 }
-
                 // process hash for each feature
                 if (featureMap.containsKey(HASH)) {
                     Object hashVal = featureMap.get(HASH);
@@ -277,7 +276,7 @@ public class ImageMapper extends FieldMapper {
 
     public ImageMapper(String name, ThreadPool threadPool, Settings indexSettings, Map<FeatureEnum, Map<String, Object>> features, Map<String, FieldMapper> featureMappers,
                        Map<String, FieldMapper> hashMappers, Map<String, FieldMapper> metadataMappers,
-                       MappedFieldType type, MappedFieldType defaultFieldType,MultiFields multiFields, CopyTo copyTo) {
+                       MappedFieldType type, MappedFieldType defaultFieldType, MultiFields multiFields, CopyTo copyTo) {
         super(name, type, defaultFieldType, indexSettings, multiFields, copyTo);
         this.name = name;
         this.threadPool = threadPool;
