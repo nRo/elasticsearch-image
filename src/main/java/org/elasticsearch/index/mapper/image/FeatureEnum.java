@@ -14,10 +14,11 @@ import net.semanticmetadata.lire.imageanalysis.features.global.joint.RankAndOppo
  * Subclass of {@link LireFeature}
  */
 public enum FeatureEnum {
-
+    ACCID(net.semanticmetadata.lire.imageanalysis.features.global.ACCID.class),
     AUTO_COLOR_CORRELOGRAM(AutoColorCorrelogram.class),
     BINARY_PATTERNS_PYRAMID(BinaryPatternsPyramid.class),
     CEDD(net.semanticmetadata.lire.imageanalysis.features.global.CEDD.class),
+    COMO(net.semanticmetadata.lire.imageanalysis.features.global.COMO.class),
     EDGE_HISTOGRAM(EdgeHistogram.class),
     COLOR_LAYOUT(ColorLayout.class),
     FCTH(net.semanticmetadata.lire.imageanalysis.features.global.FCTH.class),
